@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0f1d" />
+  <meta name="description" content="Boxed In — A 3D Dots &amp; Boxes strategy puzzle game on a 3D lattice. Claim edges, capture translucent cubes, chain extra turns, and outsmart the AI. An STF Arcade release." />
+  <title>Boxed In — 3D Strategy Puzzle | STF Arcade</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app" data-screen="setup">
+    <!-- Persistent Top Bar -->
+    <header id="hud">
+      <div class="hud-left">
+        <a id="backBtn" class="btn-back" href="https://arcade.stabthefinger.com/" title="Back to STF Arcade">
+          ← STF Arcade
+        </a>
+        <div class="brand-badge" aria-hidden="true">
+          <span class="brand-cube"></span>
+          <span class="brand-name">BOXED IN</span>
+        </div>
+      </div>
+
+      <!-- In-Game Scoreboard Strip -->
+      <div id="scoreboard" class="scoreboard hidden" aria-live="polite">
+        <div class="score-pill player-pill" id="p1ScorePill">
+          <span class="swatch-dot" id="p1SwatchDot"></span>
+          <div class="score-meta">
+            <span class="score-label" id="p1Label">P1</span>
+            <strong class="score-val" id="p1Score">0</strong>
+          </div>
+        </div>
+
+        <div class="turn-center">
+          <div class="turn-badge" id="turnBadge">
+            <span class="turn-dot" id="turnDot"></span>
+            <span id="turnText">Player 1's Turn</span>
+          </div>
+          <div class="remaining-line">
+            <span id="remainingCubesText">27 left</span>
+            <span class="sep">·</span>
+            <span id="boardDimsBadge">3×3×3</span>
+            <span class="sep">·</span>
+            <span id="matchTimer">00:00</span>
+          </div>
+        </div>
+
+        <div class="score-pill player-pill" id="p2ScorePill">
+          <span class="swatch-dot" id="p2SwatchDot"></span>
+          <div class="score-meta">
+            <span class="score-label" id="p2Label">CPU</span>
+            <strong class="score-val" id="p2Score">0</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <button id="btnStatsHud" class="chip" type="button" title="Local Career Stats">STATS</button>
+        <button id="btnHowHud" class="chip" type="button" title="How To Play">?</button>
+        <button id="btnSound" class="chip" type="button" title="Toggle Sound (M)">SND: ON</button>
+      </div>
+    </header>
+
+    <!-- Main 3D Viewport Stage -->
+    <main id="stage">
+      <div id="canvasHost" class="canvas-host"></div>
+
+      <!-- WebGL / Load Error Banner -->
+      <div id="webglFallback" class="webgl-fallback hidden" role="alert">
+        <h2>3D Renderer Unavailable</h2>
+        <p id="webglFallbackMsg">Your browser could not initialize WebGL or load Three.js.</p>
+      </div>
+
+      <!-- Setup Overlay (Floating Rotating Preview Behind/Beside) -->
+      <section id="setupScreen" class="setup-overlay" aria-label="Game Setup">
+        <div class="setup-card">
+          <div class="setup-header">
+            <div class="eyebrow">STF ARCADE · 3D STRATEGY PUZZLE</div>
+            <h1 class="game-title">BOXED IN</h1>
+            <p class="game-subtitle">Claim edges on a 3D lattice. Complete 12-edge cubes to capture space and earn extra turns.</p>
+          </div>
+
+          <!-- Game Mode -->
+          <div class="setup-section">
+            <span class="field-label">GAME MODE</span>
+            <div class="seg-grid two" role="group" aria-label="Game Mode">
+              <button class="seg-btn active" type="button" data-mode="pvc">
+                <span class="seg-title">Player vs Computer</span>
+                <span class="seg-sub">Solo strategy vs AI</span>
+              </button>
+              <button class="seg-btn" type="button" data-mode="pvp">
+                <span class="seg-title">Player vs Player</span>
+                <span class="seg-sub">Local hotseat</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- AI Difficulty -->
+          <div class="setup-section" id="aiDifficultySection">
+            <span class="field-label">AI DIFFICULTY</span>
+            <div class="seg-grid three" role="group" aria-label="AI Difficulty">
+              <button class="seg-btn" type="button" data-difficulty="easy">
+                <span class="seg-title">Easy</span>
+                <span class="seg-sub">Casual</span>
+              </button>
+              <button class="seg-btn active" type="button" data-difficulty="medium">
+                <span class="seg-title">Medium</span>
+                <span class="seg-sub">Tactical</span>
+              </button>
+              <button class="seg-btn" type="button" data-difficulty="hard">
+                <span class="seg-title">Hard</span>
+                <span class="seg-sub">Chain Master</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Board Sizes -->
+          <div class="setup-section">
+            <span class="field-label">BOARD SIZE</span>
+            <div class="seg-grid three size-grid" role="group" aria-label="Board Size">
+              <button class="seg-btn" type="button" data-size="2">
+                <span class="seg-title">Quick (2×2×2)</span>
+                <span class="seg-sub">5 minutes · 8 cubes</span>
+              </button>
+              <button class="seg-btn active" type="button" data-size="3">
+                <span class="seg-title">Standard (3×3×3)</span>
+                <span class="seg-sub">10 minutes · 27 cubes</span>
+              </button>
+              <button class="seg-btn" type="button" data-size="4">
+                <span class="seg-title">Large (4×4×4)</span>
+                <span class="seg-sub">20+ minutes · 64 cubes</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Player Colors -->
+          <div class="setup-section colors-row">
+            <div class="color-picker-block">
+              <span class="field-label">PLAYER 1 COLOR</span>
+              <div class="color-swatches" id="p1ColorSwatches" role="group" aria-label="Player 1 Color"></div>
+            </div>
+            <div class="color-picker-block">
+              <span class="field-label" id="p2ColorTitle">COMPUTER COLOR</span>
+              <div class="color-swatches" id="p2ColorSwatches" role="group" aria-label="Player 2 Color"></div>
+            </div>
+          </div>
+
+          <!-- Edge Placement Setting -->
+          <div class="setup-section">
+            <label class="toggle-row" for="chkSingleClickSetup">
+              <input type="checkbox" id="chkSingleClickSetup" />
+              <span class="toggle-text">
+                <strong>Single-click placement</strong>
+                <small>On by default on desktop (hover previews); off by default on touch devices so tapping previews before placing.</small>
+              </span>
+            </label>
+          </div>
+
+          <!-- Setup CTA -->
+          <div class="setup-actions">
+            <button id="btnStartGame" class="btn btn-primary btn-lg" type="button">▶ START GAME</button>
+            <div class="setup-secondary">
+              <button id="btnHowSetup" class="btn btn-secondary" type="button">HOW TO PLAY</button>
+              <button id="btnStatsSetup" class="btn btn-secondary" type="button">LOCAL STATS</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="preview-caption" aria-hidden="true">
+          <span class="pulse-dot"></span> LIVE 3D LATTICE PREVIEW
+        </div>
+      </section>
+
+      <!-- In-Game Floating Status & Help Overlays -->
+      <div id="gameOverlays" class="game-overlays hidden">
+        <!-- Gameplay Help Banner (hover / selected edge info) -->
+        <div id="edgeHelpPill" class="edge-help-pill" aria-live="polite">
+          <span class="help-idle">Hover or tap an edge to inspect · Drag to rotate</span>
+        </div>
+
+        <!-- AI Thinking / Extra Turn Toast -->
+        <div id="statusToast" class="status-toast hidden" aria-live="polite">
+          <span class="spinner-dot"></span>
+          <span id="statusToastText">Thinking...</span>
+        </div>
+
+        <!-- Edge Confirmation Pill (2-step placement) -->
+        <div id="confirmPill" class="confirm-pill hidden">
+          <span class="confirm-msg" id="confirmMsg">Click edge again to place</span>
+          <div class="confirm-btns">
+            <button id="btnConfirmPlace" class="btn btn-sm btn-primary" type="button">✓ Place</button>
+            <button id="btnCancelPlace" class="btn btn-sm btn-ghost" type="button">✕ Cancel</button>
+          </div>
+        </div>
+
+        <!-- Floating Restore End-Game Results Pill (when inspecting finished board) -->
+        <button id="btnShowResults" class="btn btn-primary restore-results-btn hidden" type="button">
+          ★ Show Match Results
+        </button>
+
+        <!-- Bottom Action Dock -->
+        <nav id="controlDock" class="control-dock" aria-label="Game Controls">
+          <button id="btnUndo" class="dock-btn" type="button" disabled title="Undo Last Move (Z)">
+            <span class="dock-ico">↶</span>
+            <span class="dock-lbl">Undo</span>
+          </button>
+          <button id="btnResetView" class="dock-btn" type="button" title="Reset Camera View (R)">
+            <span class="dock-ico">⌖</span>
+            <span class="dock-lbl">Reset View</span>
+          </button>
+          <button id="btnOptions" class="dock-btn" type="button" title="Match Options &amp; Camera Help">
+            <span class="dock-ico">⚙</span>
+            <span class="dock-lbl">Options</span>
+          </button>
+          <button id="btnHowGame" class="dock-btn" type="button" title="How To Play">
+            <span class="dock-ico">?</span>
+            <span class="dock-lbl">How To Play</span>
+          </button>
+          <button id="btnNewGame" class="dock-btn accent" type="button" title="Return to Setup / New Game">
+            <span class="dock-ico">＋</span>
+            <span class="dock-lbl">New Game</span>
+          </button>
+        </nav>
+      </div>
+    </main>
+  </div>
+
+  <!-- =========================================================
+       MODAL: HOW TO PLAY
+       ========================================================= -->
+  <dialog id="modalHow" class="modal" aria-labelledby="howTitle">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow">30-SECOND GUIDE</div>
+        <h2 id="howTitle">HOW TO PLAY BOXED IN</h2>
+      </div>
+      <button class="modal-close" type="button" data-close-modal="modalHow" aria-label="Close">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="rules-grid">
+        <article class="rule-card">
+          <div class="rule-num">1</div>
+          <div class="rule-art">
+            <svg viewBox="0 0 120 84" aria-hidden="true">
+              <rect x="24" y="16" width="52" height="52" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="4 3"/>
+              <line x1="24" y1="16" x2="76" y2="16" stroke="#3b82f6" stroke-width="5" stroke-linecap="round"/>
+              <line x1="24" y1="16" x2="76" y2="16" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="24" cy="16" r="4" fill="#e2e8f0"/>
+              <circle cx="76" cy="16" r="4" fill="#e2e8f0"/>
+              <circle cx="96" cy="24" r="10" fill="rgba(59,130,246,0.22)" stroke="#60a5fa" stroke-width="1.5"/>
+              <path d="M92 24 L95 27 L101 20" fill="none" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h3>1. Claim edges.</h3>
+          <p>Take turns selecting unclaimed edges on the 3D lattice. With confirmation on, click once to preview and click again to lock it in.</p>
+        </article>
+
+        <article class="rule-card">
+          <div class="rule-num">2</div>
+          <div class="rule-art">
+            <svg viewBox="0 0 120 84" aria-hidden="true">
+              <!-- Isometric cube with 11 blue edges and 1 glowing dashed edge -->
+              <polygon points="60,12 94,28 60,44 26,28" fill="none" stroke="#3b82f6" stroke-width="2.5"/>
+              <path d="M26 28 L26 60 L60 76 L94 60 L94 28" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round"/>
+              <line x1="60" y1="44" x2="60" y2="76" stroke="#fbbf24" stroke-width="4" stroke-dasharray="5 3" stroke-linecap="round"/>
+              <text x="60" y="54" text-anchor="middle" fill="#fde68a" font-size="11" font-weight="bold">11/12</text>
+            </svg>
+          </div>
+          <h3>2. Complete all 12 edges surrounding a cube.</h3>
+          <p>Each 1×1×1 cube has 12 edges. Hover any edge to see how many cubes it touches, completes, or leaves at 11/12.</p>
+        </article>
+
+        <article class="rule-card">
+          <div class="rule-num">3</div>
+          <div class="rule-art">
+            <svg viewBox="0 0 120 84" aria-hidden="true">
+              <polygon points="60,12 94,28 60,44 26,28" fill="rgba(59,130,246,0.42)" stroke="#93c5fd" stroke-width="2.5"/>
+              <polygon points="26,28 60,44 60,76 26,60" fill="rgba(59,130,246,0.28)" stroke="#60a5fa" stroke-width="2.5"/>
+              <polygon points="94,28 60,44 60,76 94,60" fill="rgba(59,130,246,0.2)" stroke="#60a5fa" stroke-width="2.5"/>
+              <text x="60" y="48" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="bold">+1</text>
+            </svg>
+          </div>
+          <h3>3. Capture cubes to score points.</h3>
+          <p>Claiming the 12th edge captures the cube! It fills with translucent color so you can still see inside the board. One edge can capture up to 4 cubes at once.</p>
+        </article>
+
+        <article class="rule-card">
+          <div class="rule-num">4</div>
+          <div class="rule-art">
+            <svg viewBox="0 0 120 84" aria-hidden="true">
+              <rect x="8" y="20" width="104" height="44" rx="10" fill="rgba(34,197,94,0.16)" stroke="#4ade80" stroke-width="2"/>
+              <path d="M29 41 A11 11 0 1 1 39 51" fill="none" stroke="#86efac" stroke-width="2.6" stroke-linecap="round"/>
+              <polygon points="37,46 44,52 36,55" fill="#86efac"/>
+              <text x="76" y="45" text-anchor="middle" fill="#dcfce7" font-size="10.5" font-weight="bold">GO AGAIN</text>
+            </svg>
+          </div>
+          <h3>4. Completing a cube grants another turn.</h3>
+          <p>Capture one or more cubes and you immediately take another move! Chain multiple captures together to swing the match.</p>
+        </article>
+
+        <article class="rule-card">
+          <div class="rule-num">5</div>
+          <div class="rule-art">
+            <svg viewBox="0 0 120 84" aria-hidden="true">
+              <rect x="16" y="42" width="24" height="24" rx="4" fill="#3b82f6"/>
+              <rect x="48" y="22" width="24" height="44" rx="4" fill="#22c55e"/>
+              <rect x="80" y="50" width="24" height="16" rx="4" fill="#ef4444"/>
+              <path d="M52 16 L60 8 L68 16" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h3>5. Most cubes wins.</h3>
+          <p>When all cubes are claimed, the player holding the highest cube count and board control percentage wins!</p>
+        </article>
+      </div>
+
+      <div class="how-tips-row">
+        <div class="tip-box">
+          <strong>Strategy Tip — Watch for Vulnerable Cubes:</strong>
+          Avoid leaving a cube with 11 of 12 edges unless forced — your opponent will capture it and chain extra turns.
+        </div>
+        <div class="tip-box">
+          <strong>Camera Controls:</strong>
+          <span><b>Desktop:</b> Left-drag rotate · Wheel zoom · Right-drag pan</span><br />
+          <span><b>Mobile:</b> 1-finger rotate · Pinch zoom · 2-finger pan</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn btn-primary" type="button" data-close-modal="modalHow">GOT IT</button>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       MODAL: LOCAL CAREER STATS
+       ========================================================= -->
+  <dialog id="modalStats" class="modal" aria-labelledby="statsTitle">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow">LOCAL STORAGE · NO ACCOUNT NEEDED</div>
+        <h2 id="statsTitle">CAREER STATISTICS</h2>
+      </div>
+      <button class="modal-close" type="button" data-close-modal="modalStats" aria-label="Close">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="stats-kpi-grid" id="statsKpiGrid">
+        <div class="kpi-card">
+          <span class="kpi-lbl">Games Played</span>
+          <strong class="kpi-val" id="statGamesPlayed">0</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-lbl">Games Won</span>
+          <strong class="kpi-val" id="statGamesWon">0</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-lbl">Win Percentage</span>
+          <strong class="kpi-val" id="statWinPct">0.0%</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-lbl">Best Win % by Color</span>
+          <strong class="kpi-val" id="statBestColor">—</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-lbl">Fastest Victory</span>
+          <strong class="kpi-val" id="statFastest">—</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-lbl">Largest Margin</span>
+          <strong class="kpi-val" id="statMargin">—</strong>
+        </div>
+      </div>
+
+      <h3 class="subhead">Performance by Color</h3>
+      <div class="color-stats-grid" id="colorStatsGrid"></div>
+    </div>
+
+    <div class="modal-foot space-between">
+      <button id="btnResetStats" class="btn btn-danger-outline" type="button">Reset Stats</button>
+      <button class="btn btn-primary" type="button" data-close-modal="modalStats">CLOSE</button>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       MODAL: OPTIONS (IN-GAME QUICK SETTINGS)
+       ========================================================= -->
+  <dialog id="modalOptions" class="modal modal-compact" aria-labelledby="optionsTitle">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow">PREFERENCES</div>
+        <h2 id="optionsTitle">GAME OPTIONS</h2>
+      </div>
+      <button class="modal-close" type="button" data-close-modal="modalOptions" aria-label="Close">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <label class="toggle-row" for="chkSingleClickModal">
+        <input type="checkbox" id="chkSingleClickModal" />
+        <span class="toggle-text">
+          <strong>Single-click placement</strong>
+          <small>Claim edges immediately on first click without confirmation.</small>
+        </span>
+      </label>
+
+      <label class="toggle-row" for="chkSoundModal">
+        <input type="checkbox" id="chkSoundModal" />
+        <span class="toggle-text">
+          <strong>Sound effects</strong>
+          <small>Procedural synth feedback for edge selection, captures, and victory.</small>
+        </span>
+      </label>
+
+      <div class="tip-box">
+        <strong>Camera Shortcuts</strong>
+        <span><b>R:</b> Reset View · <b>Z / Ctrl+Z:</b> Undo · <b>M:</b> Mute · <b>Esc:</b> Cancel Selection</span>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn btn-primary" type="button" data-close-modal="modalOptions">DONE</button>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       MODAL: END GAME SUMMARY
+       ========================================================= -->
+  <dialog id="modalEnd" class="modal modal-compact" aria-labelledby="endTitle">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow" id="endEyebrow">MATCH COMPLETE</div>
+        <h2 id="endTitle">Player Blue wins</h2>
+      </div>
+      <button class="modal-close" type="button" id="btnInspectBoard" title="Inspect Final 3D Board" aria-label="Inspect Board">✕</button>
+    </div>
+
+    <div class="modal-body end-body">
+      <div class="end-score-hero">
+        <div class="end-score-line" id="endScoreLine">18 cubes to 9</div>
+        <div class="end-control-line" id="endControlLine">66.7% board control</div>
+      </div>
+
+      <div class="control-bar-wrap">
+        <div class="control-bar" id="endControlBar">
+          <div class="bar-seg p1" id="endBarP1" style="width: 50%"></div>
+          <div class="bar-seg p2" id="endBarP2" style="width: 50%"></div>
+        </div>
+        <div class="control-legend">
+          <span id="endLegendP1">Player 1: 0</span>
+          <span id="endLegendP2">Player 2: 0</span>
+        </div>
+      </div>
+
+      <div class="end-meta-row" id="endMetaRow">
+        <span id="endMetaSize">Standard (3×3×3)</span>
+        <span class="sep">·</span>
+        <span id="endMetaTime">00:00</span>
+      </div>
+    </div>
+
+    <div class="modal-foot end-actions">
+      <button id="btnPlayAgain" class="btn btn-primary btn-lg" type="button">▶ PLAY AGAIN</button>
+      <div class="end-sub-actions">
+        <button id="btnEndSetup" class="btn btn-secondary" type="button">Change Setup</button>
+        <button id="btnEndStats" class="btn btn-secondary" type="button">Stats</button>
+        <button id="btnEndInspect" class="btn btn-ghost" type="button">Inspect Board</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
