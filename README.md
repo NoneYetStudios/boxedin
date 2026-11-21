@@ -4,9 +4,7 @@ Capture cubes, control territory, and outsmart your opponent in this 3D strategy
 
 Built with HTML, CSS, JavaScript, and Three.js. No build step, no backend, no accounts, and no server-side storage required.
 
-## Play Online
-
-🌐 https://boxedin.stabthefinger.com/
+Built with **Google Antigravity** · Play it live: [boxedin.stabthefinger.com](https://boxedin.stabthefinger.com) · Part of the [STF Arcade](https://stabthefinger.com/stfarcade.html)
 
 ## Screenshot
 
